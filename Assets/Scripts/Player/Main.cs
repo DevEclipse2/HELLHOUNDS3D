@@ -1,3 +1,5 @@
+using TMPro;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.XR;
@@ -7,7 +9,9 @@ public class Main : MonoBehaviour
     Animator animator;
     Rigidbody rb;
     public Transform groundCheck;
-    public Transform GCheckArea;
+    public GameObject weapon;
+    Gun gun;
+    public TextMeshProUGUI speedTMP;
     public float moveSpeed;
     public float JumpF;
     public bool movable;
@@ -24,6 +28,12 @@ public class Main : MonoBehaviour
     public int minFov;
     public int maxFov;
     public float speedMaxFov;
+    void Start()
+    {
+        animator = GetComponent<Animator>();
+        rb = GetComponent<Rigidbody>();
+        gun = weapon.GetComponent<Gun>();
+    }
     public void OnMove(InputValue value)
     {
         if (value != null)
@@ -31,7 +41,15 @@ public class Main : MonoBehaviour
             movedir = value.Get<Vector2>();
         }
     }
+    public void OnAttack(InputValue val)
+    {
+        if (val.isPressed)
+        {
+            gun.Shoot();
 
+
+        }
+    }
     public void OnLook(InputValue value)
     {
         //Debug.Log("look");
@@ -46,8 +64,8 @@ public class Main : MonoBehaviour
 
     public bool GroundCheck()
     {
-        return Physics.Raycast(groundCheck.position, Vector3.down, 0.5f, groundLayer);
-        return Physics.BoxCast(groundCheck.position, GCheckArea.localScale, Vector3.zero , Quaternion.LookRotation(Vector3.down), 0, groundLayer);
+        
+        return Physics.Raycast(groundCheck.position, Vector3.down, 0.5f, groundLayer) || Physics.Raycast(groundCheck.position, Vector3.up, 0.5f, groundLayer);
     }
     public void OnJump(InputValue value)
     {
@@ -55,40 +73,52 @@ public class Main : MonoBehaviour
         {
             if (value.isPressed)
             {
-                Debug.Log("Jump");
-                rb.linearVelocity = new Vector3(rb.linearVelocity.x, JumpF , rb.linearVelocity.z);
+                if (grounded)
+                {
+                    Debug.Log("Jump");
+                    rb.linearVelocity = new Vector3(rb.linearVelocity.x, JumpF, rb.linearVelocity.z);
+                }
             }
         }
     }
     // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-    {
-        rb = GetComponent<Rigidbody>();
-    }
 
-    // Update is called once per frame
-    void Update()
+    void ApplyMovement()
     {
-        Vector2 horispeed = new Vector2(rb.linearVelocity.x, rb.linearVelocity.z);
-        Debug.Log(horispeed.magnitude);
-        camera.GetComponent<Camera>().fieldOfView = ((maxFov - minFov) * horispeed.magnitude / speedMaxFov) + minFov;
-        if (grounded = GroundCheck())
+
+        Vector3 playerSpeed = Quaternion.Inverse(transform.rotation) * rb.linearVelocity;
+        if (grounded)
         {
-            Vector3 movement = transform.forward * movedir.y * moveSpeed + transform.right * movedir.x * moveSpeed;
+            playerSpeed.z += movedir.y * moveSpeed;
+            playerSpeed.x += movedir.x * moveSpeed;
 
-            if (horispeed.magnitude < moveSpeed)
+            if (movedir.y == 0)
             {
-                //Debug.Log("accelerate");
-                rb.AddForce(movement * 8 * 0.33f);
+                playerSpeed.z = playerSpeed.z * 0.92f;
             }
-            //else
-            //{
-            //    rb.linearVelocity = new Vector3(movement.x, rb.linearVelocity.y, movement.z);
-            //}
+            else
+            {
+                playerSpeed.z -= playerSpeed.z * 0.4f;
+            }
+            if (movedir.x == 0)
+            {
+                playerSpeed.x = playerSpeed.x * 0.92f;
+            }
+            else
+            {
+                playerSpeed.x -= playerSpeed.x * 0.4f;
+            }
         }
         else
         {
-            rb.AddForce(transform.forward * AirStrafespeed * Time.deltaTime);
         }
+        rb.linearVelocity = transform.rotation * playerSpeed;
+    }
+    // Update is called once per frame
+    void Update()
+    {
+        speedTMP.text = ("Speed : " + Mathf.FloorToInt( rb.linearVelocity.magnitude * 1000) + " m/s");
+        grounded = GroundCheck();
+        ApplyMovement();
     }
 }
